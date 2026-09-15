@@ -1,0 +1,14 @@
+{
+  "service": "payment-api",
+  "timestamp": "2026-09-15T18:30:00Z",
+  "latency": {
+    "p50_ms": 420,
+    "p95_ms": 5800,
+    "p99_ms": 7200
+  },
+  "requests_per_second": 842,
+  "error_rate_percent": 1.2,
+  "cpu_percent": 42,
+  "memory_percent": 58,
+  "database_latency_ms": 4900
+}

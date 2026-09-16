@@ -15,6 +15,13 @@ def search_logs(
     Later this will query Google Cloud Logging.
     """
 
+    print(
+        f"[TOOL] search_logs("
+        f"service={service}, "
+        f"keyword={keyword!r}"
+        f")"
+    )
+
     log_file = LOGS_DIR / f"{service}.log"
 
     if not log_file.exists():

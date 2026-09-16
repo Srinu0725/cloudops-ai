@@ -13,6 +13,10 @@ def get_recent_deployment(service: str) -> dict:
     Later this can query a real deployment system.
     """
 
+    print(
+        f"[TOOL] get_recent_deployment(service={service})"
+    )
+
     deployment_file = DEPLOYMENTS_DIR / f"{service}.json"
 
     if not deployment_file.exists():

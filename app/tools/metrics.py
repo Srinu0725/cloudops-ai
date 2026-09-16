@@ -12,6 +12,9 @@ def get_service_metrics(service: str) -> dict:
     Currently reads mock metrics from local JSON files.
     Later this will query Google Cloud Monitoring.
     """
+    print(
+    f"[TOOL] get_service_metrics(service={service})"
+    )
 
     metrics_file = METRICS_DIR / f"{service}.json"
 

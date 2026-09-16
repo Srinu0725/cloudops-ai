@@ -18,18 +18,18 @@ async def main():
     )
 
     message = types.Content(
-        role="user",
-        parts=[
-            types.Part(
-                text=(
-                    "The Payment API latency has suddenly "
-                    "increased. Investigate the issue and "
-                    "identify the likely root cause."
-                )
+    role="user",
+    parts=[
+        types.Part(
+            text=(
+                "The payment-api service is experiencing "
+                "a sudden increase in latency. "
+                "Investigate the issue and identify "
+                "the likely root cause."
             )
-        ],
-    )
-
+        )
+    ],
+)
     print("\nStarting CloudOps AI investigation...\n")
 
     async for event in runner.run_async(

@@ -1,33 +1,29 @@
-import json
-from pathlib import Path
+from app.observability.local import LocalObservabilityProvider
 
 
-METRICS_DIR = Path("data/metrics")
+provider = LocalObservabilityProvider()
 
 
-def get_service_metrics(service: str) -> dict:
+def get_service_metrics(
+    service: str,
+    start_time: str | None = None,
+    end_time: str | None = None,
+) -> dict:
     """
-    Retrieve metrics for a service.
+    Retrieve service metrics through the configured
+    observability provider.
 
-    Currently reads mock metrics from local JSON files.
-    Later this will query Google Cloud Monitoring.
+    Args:
+        service: Name of the service.
+        start_time: Optional ISO-8601 start timestamp.
+        end_time: Optional ISO-8601 end timestamp.
+
+    Returns:
+        Historical or snapshot metric data.
     """
-    print(
-    f"[TOOL] get_service_metrics(service={service})"
+
+    return provider.get_service_metrics(
+        service=service,
+        start_time=start_time,
+        end_time=end_time,
     )
-
-    metrics_file = METRICS_DIR / f"{service}.json"
-
-    if not metrics_file.exists():
-        return {
-            "error": f"No metrics available for service: {service}"
-        }
-
-    try:
-        with metrics_file.open("r", encoding="utf-8") as file:
-            return json.load(file)
-
-    except json.JSONDecodeError:
-        return {
-            "error": f"Invalid metrics data for service: {service}"
-        }

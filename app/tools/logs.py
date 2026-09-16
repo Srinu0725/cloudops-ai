@@ -1,48 +1,32 @@
-from pathlib import Path
+from app.observability.local import LocalObservabilityProvider
 
 
-LOGS_DIR = Path("data/logs")
+provider = LocalObservabilityProvider()
 
 
 def search_logs(
     service: str,
     keyword: str | None = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
 ) -> list[str]:
     """
-    Search service logs.
+    Search service logs through the configured
+    observability provider.
 
-    Currently reads local log files.
-    Later this will query Google Cloud Logging.
+    Args:
+        service: Name of the service.
+        keyword: Optional keyword to search for.
+        start_time: Optional ISO-8601 start timestamp.
+        end_time: Optional ISO-8601 end timestamp.
+
+    Returns:
+        Matching log lines.
     """
 
-    print(
-        f"[TOOL] search_logs("
-        f"service={service}, "
-        f"keyword={keyword!r}"
-        f")"
+    return provider.search_logs(
+        service=service,
+        keyword=keyword,
+        start_time=start_time,
+        end_time=end_time,
     )
-
-    log_file = LOGS_DIR / f"{service}.log"
-
-    if not log_file.exists():
-        return [
-            f"No logs available for service: {service}"
-        ]
-
-    with log_file.open("r", encoding="utf-8") as file:
-        lines = [
-            line.strip()
-            for line in file
-            if line.strip()
-        ]
-
-    if keyword is None:
-        return lines
-
-    keyword_lower = keyword.lower()
-
-    return [
-        line
-        for line in lines
-        if keyword_lower in line.lower()
-    ]

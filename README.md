@@ -4,9 +4,9 @@
 
 CloudOps AI is an **Agentic AI system for investigating production incidents automatically**.
 
-Instead of requiring an engineer to manually inspect metrics, logs, recent deployments, and operational documentation, CloudOps AI uses an AI agent to gather evidence through tools, correlate signals, identify the most likely root cause, and recommend remediation steps.
+Instead of requiring an engineer to manually inspect metrics, logs, recent deployments, and operational documentation, CloudOps AI gathers operational evidence, correlates signals across time, identifies likely root-cause hypotheses, evaluates evidence strength, and generates actionable investigation reports.
 
-The system is designed around a simple principle:
+The system is designed around:
 
 ```text
 READ → INVESTIGATE → CORRELATE → EXPLAIN → RECOMMEND
@@ -16,258 +16,724 @@ CloudOps AI operates in **read-only mode**. It does not automatically modify pro
 
 ---
 
-## Why CloudOps AI?
+# Why CloudOps AI?
 
-When a production service becomes slow or starts failing, engineers typically need to investigate several independent sources:
+When a production service becomes slow or starts failing, engineers typically investigate multiple independent sources:
 
 ```text
-Metrics
-   ↓
-Logs
-   ↓
-Database
-   ↓
-Recent Deployments
-   ↓
-Runbooks / Documentation
+                Production Incident
+                        │
+        ┌───────────────┼────────────────┐
+        ▼               ▼                ▼
+     Metrics           Logs         Deployments
+        │               │                │
+        └───────────────┼────────────────┘
+                        ▼
+                  Runbooks / Docs
+                        │
+                        ▼
+                Evidence Correlation
+                        │
+                        ▼
+                  Root Cause Analysis
 ```
 
-The difficult part isn't accessing each source individually.
+The difficult part is not accessing each source individually.
 
 The difficult part is **correlating the evidence**.
 
 For example:
 
-> "Payment API latency has suddenly increased."
+> Payment API latency has suddenly increased.
 
-An engineer might need to determine:
+The investigation needs to determine:
 
 * Did request latency increase?
 * Is the database slow?
 * Are CPU or memory resources exhausted?
 * Are errors increasing?
 * Did a recent deployment introduce a change?
-* Are application logs showing a specific failing query?
-* Does the service runbook contain relevant troubleshooting guidance?
-* Which signal is the actual bottleneck?
-* What should be done next?
+* Are application logs showing slow queries?
+* Does the runbook contain relevant troubleshooting guidance?
+* Which signals correlate in time?
+* What evidence supports the root-cause hypothesis?
+* What evidence is still missing?
+* What should an engineer investigate next?
 
-CloudOps AI is designed to automate this investigation process.
+CloudOps AI is designed to automate this investigation process while keeping humans responsible for production-changing actions.
 
 ---
 
-## Core Concept
+# Core Concept
 
 ```text
-                        Production Incident
-                                │
-                                ▼
-                       ┌─────────────────┐
-                       │   CloudOps AI   │
-                       │   AI Agent      │
-                       └────────┬────────┘
-                                │
-              ┌─────────────────┼─────────────────┐
-              │                 │                 │
-              ▼                 ▼                 ▼
-          Metrics             Logs          Deployments
-              │                 │                 │
-              └─────────────────┼─────────────────┘
-                                │
-                                ▼
-                         ┌─────────────┐
-                         │     RAG     │
-                         │  Runbooks   │
-                         │  Knowledge  │
-                         └──────┬──────┘
-                                │
-                                ▼
-                     Evidence Correlation
-                                │
-                                ▼
-                      Root Cause Analysis
-                                │
-                                ▼
-                       Recommendation
+                         Production Incident
+                                  │
+                                  ▼
+                         ┌─────────────────┐
+                         │   FastAPI API   │
+                         └────────┬────────┘
+                                  │
+                                  ▼
+                         ┌─────────────────┐
+                         │ Incident Event  │
+                         └────────┬────────┘
+                                  │
+                                  ▼
+                         ┌─────────────────┐
+                         │  asyncio Queue  │
+                         └────────┬────────┘
+                                  │
+                                  ▼
+                         ┌─────────────────┐
+                         │ Background      │
+                         │ Worker          │
+                         └────────┬────────┘
+                                  │
+                                  ▼
+                     ┌────────────────────────┐
+                     │ Investigation Engine   │
+                     └────────────┬───────────┘
+                                  │
+              ┌───────────────────┼───────────────────┐
+              ▼                   ▼                   ▼
+           Metrics              Logs             Deployments
+              │                   │                   │
+              └───────────────────┼───────────────────┘
+                                  │
+                                  ▼
+                         ┌─────────────────┐
+                         │ RAG / Runbooks  │
+                         └────────┬────────┘
+                                  │
+                                  ▼
+                         Evidence Correlation
+                                  │
+                                  ▼
+                         Deterministic RCA
+                                  │
+                                  ▼
+                         Confidence Calibration
+                                  │
+                                  ▼
+                         Final Incident Report
 ```
 
-The important part is that the LLM is not simply answering:
+The LLM/agent is not simply asked:
 
 > "What do you think caused this?"
 
-Instead, the agent decides which tools it needs, gathers operational evidence, and reasons over that evidence.
+Instead, the system gathers operational evidence first and uses that evidence to build and evaluate root-cause hypotheses.
 
 ---
 
-## Example Investigation
+# Example Investigation
 
-### Incident
+## Incident
 
 ```text
 The Payment API latency has suddenly increased.
+
 Investigate the issue.
 ```
 
-### Metrics
+## Observed Metrics
 
 ```text
-API P95 latency:       5800 ms
-API P99 latency:       7200 ms
-Database latency:      4900 ms
-CPU utilization:       42%
-Memory utilization:    58%
-Error rate:            1.2%
-Throughput:            842 requests/sec
+API P50 latency:       420 ms
+API P95 latency:      5800 ms
+API P99 latency:      7200 ms
+
+Database latency:     4900 ms
+
+CPU utilization:        42%
+Memory utilization:     58%
+
+Error rate:              1.2%
+Throughput:              842 requests/sec
 ```
 
-### Logs
+The investigation engine compares the current observations with historical baseline data.
+
+Example baseline:
 
 ```text
-database query latency=3200ms query=payment_lookup
-database query latency=3700ms query=payment_lookup
-database query latency=4100ms query=payment_lookup
-database query latency=4500ms query=payment_lookup
-request latency=5800ms endpoint=/payments
-request timeout endpoint=/payments
+Metric              Baseline      Current
+------------------------------------------------
+DB latency             390 ms       4900 ms
+P95 latency            415 ms       5800 ms
+P99 latency            445 ms       7200 ms
+Error rate              0.2%          1.2%
+CPU                      40%            42%
+Memory                   54%            58%
+RPS                     ~798           842
 ```
 
-### Deployment
+This allows the system to distinguish service degradation from relatively stable resource utilization.
+
+---
+
+# Log Evidence
+
+Example time-windowed logs:
+
+```text
+18:18:12  deployment version=v1.8.3
+
+18:21:44  database query latency=3200ms
+          query=payment_lookup
+
+18:23:18  database query latency=3700ms
+          query=payment_lookup
+
+18:24:01  database query latency=4100ms
+          query=payment_lookup
+
+18:25:42  database query latency=4500ms
+          query=payment_lookup
+
+18:27:33  request latency=5800ms
+          endpoint=/payments
+
+18:28:14  database connection duration=4700ms
+
+18:29:51  database connection duration=4900ms
+
+18:30:00  request timeout
+          endpoint=/payments
+```
+
+---
+
+# Deployment Evidence
 
 ```text
 Version:          v1.8.3
-Previous:         v1.8.2
+Previous Version: v1.8.2
 
 Changes:
-- Updated payment_lookup query
+
+- Updated payment lookup query
 - Added transaction metadata filtering
 ```
 
-### Agent Reasoning
+---
+
+# Investigation Timeline
+
+CloudOps AI constructs a chronological incident timeline:
 
 ```text
-Deployment
-    │
-    ├── v1.8.3 deployed at 18:15
-    │
-    ▼
-Database query latency begins increasing
-    │
-    ├── payment_lookup: 3.2s → 3.7s → 4.1s → 4.5s
-    │
-    ▼
-Database latency reaches 4.9s
-    │
-    ▼
-API P95 reaches 5.8s
-    │
-    ▼
-Requests begin timing out
+18:15
+Deployment v1.8.3
+       │
+       ▼
+18:20
+First metric degradation
+       │
+       ▼
+18:21
+payment_lookup query slows
+       │
+       ▼
+18:25
+API/database latency increases significantly
+       │
+       ▼
+18:27
+API request latency reaches 5.8 seconds
+       │
+       ▼
+18:30
+Payment request timeout
 ```
 
-### Result
+This temporal correlation is used as evidence when evaluating root-cause hypotheses.
+
+---
+
+# Root Cause Analysis
+
+CloudOps AI separates:
+
+```text
+Observed Evidence
+        ↓
+Correlation
+        ↓
+Hypothesis
+        ↓
+Confidence
+        ↓
+Missing Evidence
+        ↓
+Recommended Investigation
+```
+
+Example:
 
 ```text
 Likely Root Cause:
-The modified payment_lookup query introduced in v1.8.3
-is the most likely cause of the database latency increase.
 
-Confidence:
-High
-
-Recommendation:
-Investigate the query execution plan and index usage.
-Consider rollback to v1.8.2 if customer impact is significant,
-subject to human approval.
+A query-level performance regression associated with
+the payment_lookup changes introduced in v1.8.3.
 ```
 
-The agent must distinguish between **observed evidence** and **hypotheses**.
+The system deliberately avoids unsupported claims.
 
-For example, it should not claim:
+For example, it should **not** claim:
 
 ```text
-"The query is definitely missing an index."
+"The query definitely has a missing index."
 ```
 
-unless the system has actually inspected the database execution plan.
+unless the database execution plan actually proves that.
 
 Instead:
 
 ```text
 "The evidence strongly suggests a query-level performance
-regression. Missing indexes or a changed execution plan should
-be investigated."
+regression. Query execution plans and index usage should
+be investigated to confirm the cause."
 ```
 
 ---
 
-## Architecture
+# Evidence Model
 
-### Current MVP
-
-The initial version uses local mock operational data so the complete agentic investigation workflow can be developed without requiring paid cloud infrastructure.
+CloudOps AI categorizes investigation evidence into multiple sources:
 
 ```text
-                         ┌────────────────────┐
-                         │    FastAPI API     │
-                         └─────────┬──────────┘
-                                   │
-                                   ▼
-                         ┌────────────────────┐
-                         │   Google ADK       │
-                         │   Agent            │
-                         └─────────┬──────────┘
-                                   │
-                    ┌──────────────┼──────────────┐
-                    │              │              │
-                    ▼              ▼              ▼
-              Metrics Tool    Logs Tool    Deployment Tool
-                    │              │              │
-                    ▼              ▼              ▼
-              Local JSON       Local Log       Local JSON
-                    │              │              │
-                    └──────────────┼──────────────┘
-                                   │
-                                   ▼
-                            Gemini Model
-                                   │
-                                   ▼
-                          Investigation Result
+1. Metrics
+2. Application Logs
+3. Deployment History
+4. Operational Runbooks
 ```
 
-The local data sources will later be replaced by real production observability systems.
+Evidence is collected with information such as:
+
+```text
+Evidence Type
+Source
+Observation
+Strength
+Timestamp
+Supporting Data
+```
+
+Important distinction:
+
+> Evidence strength indicates how relevant and directly observed the evidence is. It does not automatically establish causality.
+
+Causality is evaluated separately by the RCA layer.
 
 ---
 
-## Technology Stack
+# Metric Analysis
 
-| Layer            | Technology                 | Purpose                              |
-| ---------------- | -------------------------- | ------------------------------------ |
-| Language         | Python                     | Core application                     |
-| API              | FastAPI                    | Incident API                         |
-| AI Model         | Gemini                     | Reasoning and investigation          |
-| Agent Framework  | Google ADK                 | Agent orchestration and tool calling |
-| RAG              | Embeddings + Vector Search | Runbook and operational knowledge    |
-| Logs             | Google Cloud Logging       | Production log investigation         |
-| Metrics          | Google Cloud Monitoring    | Production metrics                   |
-| Eventing         | Google Cloud Pub/Sub       | Incident-triggered investigations    |
-| Storage          | Google Cloud Storage       | Runbooks and operational documents   |
-| Database         | PostgreSQL / Cloud SQL     | Incident and application data        |
-| Containerization | Docker                     | Application packaging                |
-| Deployment       | Cloud Run                  | Application hosting                  |
-| CI/CD            | Cloud Build                | Automated deployment                 |
-| Security         | IAM + Secret Manager       | Identity and secret management       |
-| Testing          | Pytest                     | Unit and integration testing         |
-| Load Testing     | k6 / Locust                | Performance testing                  |
+The observability engine currently analyzes **8 service-health signals**:
 
-The MVP currently focuses on the **free Gemini API + local development workflow**. Cloud infrastructure integrations are introduced incrementally.
+```text
+1. P50 latency
+2. P95 latency
+3. P99 latency
+4. Request throughput
+5. Error rate
+6. CPU utilization
+7. Memory utilization
+8. Database latency
+```
+
+Historical observations are used to construct a baseline.
+
+The system can identify deviations such as:
+
+```text
+Database latency:
+390 ms → 4900 ms
+
+P95 latency:
+415 ms → 5800 ms
+
+P99 latency:
+445 ms → 7200 ms
+
+Error rate:
+0.2% → 1.2%
+```
+
+The analyzer also avoids treating every change as an anomaly.
+
+For example, a small increase in request throughput does not automatically indicate an incident.
 
 ---
 
-## Agent Tools
+# Baseline-Aware Anomaly Detection
 
-The CloudOps AI agent is designed around tools rather than hard-coded investigation logic.
+The investigation engine uses historical observations immediately preceding the incident window as the baseline.
 
-### Current Tools
+Conceptually:
+
+```text
+Historical Data
+      │
+      ▼
+Baseline
+      │
+      ▼
+Current Incident Window
+      │
+      ▼
+Compare
+      │
+      ▼
+Detect Anomalies
+```
+
+This is more useful than comparing the current value against a fixed hard-coded threshold because normal service behavior can vary between systems.
+
+---
+
+# RAG / Operational Knowledge
+
+CloudOps AI includes a local RAG pipeline for operational documentation.
+
+Current pipeline:
+
+```text
+Runbook / Documentation
+          │
+          ▼
+    Document Loader
+          │
+          ▼
+   Section-Aware Chunking
+          │
+          ▼
+ Sentence Transformer
+   Embeddings
+          │
+          ▼
+     FAISS Vector Store
+          │
+          ▼
+      Retriever
+          │
+          ▼
+    search_runbook()
+          │
+          ▼
+ Investigation Engine
+```
+
+Current embedding model:
+
+```text
+all-MiniLM-L6-v2
+```
+
+The vector store uses normalized embeddings with similarity search.
+
+Runbook retrieval is performed using investigation-specific queries such as:
+
+```text
+payment-api high latency database latency error rate troubleshooting
+```
+
+and:
+
+```text
+payment-api slow database query payment_lookup investigation
+```
+
+This allows operational knowledge to be retrieved based on the incident rather than blindly passing the entire runbook to the model.
+
+---
+
+# Investigation Summary
+
+The investigation engine produces an intermediate structured summary containing:
+
+```text
+Incident
+Service
+Investigation Window
+Baseline
+Current Metrics
+Anomalies
+Logs
+Deployment
+Timeline
+Evidence
+Runbook Context
+```
+
+This summary becomes the evidence package used by the RCA layer.
+
+---
+
+# Deterministic RCA
+
+CloudOps AI does not rely entirely on LLM reasoning for root-cause analysis.
+
+A deterministic RCA layer evaluates observable relationships such as:
+
+```text
+Database anomaly
+        +
+Slow database query
+        +
+Recent query-related deployment
+        +
+API latency anomaly
+        +
+Temporal correlation
+```
+
+These signals are combined into root-cause hypotheses.
+
+The result distinguishes between:
+
+```text
+Observed
+```
+
+and:
+
+```text
+Inferred
+```
+
+This helps reduce unsupported conclusions.
+
+---
+
+# Confidence Calibration
+
+Each root-cause hypothesis receives an evidence-supported confidence assessment.
+
+The calibration considers factors such as:
+
+```text
+Metric anomalies
+Database latency anomaly
+API latency anomaly
+Slow query evidence
+Deployment query changes
+Missing diagnostic evidence
+```
+
+Confidence is reported as:
+
+```text
+HIGH
+MEDIUM
+LOW
+```
+
+The confidence score represents **evidence-supported confidence**, not a statistical probability that the hypothesis is correct.
+
+---
+
+# Missing Evidence
+
+A key design feature is explicitly identifying what the system does **not** know.
+
+For the payment-api example, the system may identify missing evidence such as:
+
+```text
+- EXPLAIN ANALYZE output
+- Query execution plan
+- Index usage
+- Database CPU
+- Database I/O
+- Lock contention
+- Query statistics
+```
+
+This prevents the investigation from turning an incomplete hypothesis into a false certainty.
+
+---
+
+# Final Incident Report
+
+The investigation produces a structured final report containing:
+
+```text
+Report Version
+Affected Service
+Incident
+Investigation Window
+Impact
+Timeline
+Observed Evidence
+Root-Cause Hypotheses
+Limitations
+Missing Evidence
+Runbook Guidance
+Recommended Next Steps
+```
+
+The report is designed to be consumed by an engineer, API client, or future incident-management interface.
+
+---
+
+# Event-Driven Architecture
+
+CloudOps AI now supports an asynchronous event-driven investigation workflow.
+
+Current local architecture:
+
+```text
+POST /incidents
+      │
+      ▼
+IncidentEvent
+      │
+      ▼
+asyncio.Queue
+      │
+      ▼
+IncidentWorker
+      │
+      ▼
+Investigation
+      │
+      ▼
+RCA
+      │
+      ▼
+Final Report
+```
+
+The current implementation uses a local `asyncio.Queue`.
+
+This allows incident ingestion to be separated from potentially longer-running investigation work.
+
+---
+
+# Incident Lifecycle
+
+Each incident has a tracked lifecycle.
+
+```text
+CREATED
+   │
+   ▼
+INVESTIGATING
+   │
+   ▼
+ANALYZING
+   │
+   ▼
+RCA
+   │
+   ▼
+REPORT_GENERATED
+   │
+   ▼
+COMPLETED
+```
+
+Failures transition the incident into:
+
+```text
+FAILED
+```
+
+The system tracks timestamps such as:
+
+```text
+created_at
+started_at
+completed_at
+failed_at
+```
+
+This provides the foundation for future persistent incident history and retry handling.
+
+---
+
+# Incident API
+
+## Create Incident
+
+```http
+POST /incidents
+Content-Type: application/json
+```
+
+Example request:
+
+```json
+{
+  "service": "payment-api",
+  "description": "Payment API latency has suddenly increased",
+  "severity": "high",
+  "start_time": "2026-09-15T18:20:00Z",
+  "end_time": "2026-09-15T18:30:00Z"
+}
+```
+
+The API responds with an accepted incident:
+
+```json
+{
+  "incident_id": "generated-id",
+  "status": "CREATED",
+  "message": "Incident created and queued for investigation."
+}
+```
+
+The endpoint returns HTTP:
+
+```text
+202 Accepted
+```
+
+because investigation happens asynchronously.
+
+---
+
+## Get Incident Status
+
+```http
+GET /incidents/{incident_id}/status
+```
+
+Example:
+
+```json
+{
+  "incident_id": "abc123",
+  "service": "payment-api",
+  "status": "INVESTIGATING",
+  "stage": "ANALYZING",
+  "created_at": "...",
+  "started_at": "...",
+  "completed_at": null,
+  "failed_at": null,
+  "error": null
+}
+```
+
+---
+
+## Get Incident
+
+```http
+GET /incidents/{incident_id}
+```
+
+Returns the complete incident state, including the final investigation report once processing is complete.
+
+---
+
+# Agent Tools
+
+The agent is designed around tools rather than hard-coded answers.
+
+Current operational tools include:
 
 ```text
 get_service_metrics()
@@ -283,249 +749,78 @@ search_logs()
 get_recent_deployment()
         │
         └── Retrieves recent deployment information
-```
 
-### Planned Tools
 
-```text
-search_runbook()
+investigate_incident()
         │
-        └── Retrieves relevant operational knowledge
+        └── Runs the complete evidence-driven investigation
 ```
 
-Later:
-
-```text
-query_cloud_monitoring()
-query_cloud_logging()
-query_database()
-search_incident_history()
-```
-
-This allows the agent to decide what information it needs during an investigation.
+The RAG system additionally provides operational knowledge retrieval through the runbook search pipeline.
 
 ---
 
-## Agentic Workflow
+# Agentic Workflow
 
-The agent follows an investigation loop rather than a fixed response template.
+The investigation follows an evidence-first workflow:
 
 ```text
 Incident
    │
    ▼
-Understand problem
+Understand Problem
    │
    ▼
-Identify service
+Identify Service
    │
    ▼
-Gather evidence
+Collect Evidence
    │
-   ├──── Metrics
-   │
-   ├──── Logs
-   │
-   ├──── Deployment
-   │
-   └──── Runbook
+   ├── Metrics
+   ├── Logs
+   ├── Deployment
+   └── Runbook
    │
    ▼
-Correlate signals
+Build Timeline
    │
    ▼
-Generate possible causes
+Analyze Baseline
    │
    ▼
-Eliminate unsupported causes
+Detect Anomalies
    │
    ▼
-Select most likely cause
+Correlate Evidence
    │
    ▼
-Assign confidence
+Generate Hypotheses
    │
    ▼
-Recommend remediation
+Evaluate Evidence
+   │
+   ▼
+Calibrate Confidence
+   │
+   ▼
+Identify Missing Evidence
+   │
+   ▼
+Generate Recommendations
+   │
+   ▼
+Final Incident Report
 ```
 
-The agent must never invent evidence.
+The system must never invent operational evidence.
 
 ---
 
-## Root Cause Analysis Model
+# Safety Model
 
-CloudOps AI separates investigation into several layers.
+CloudOps AI is intentionally designed as a **read-only incident investigator**.
 
-### 1. Symptoms
-
-What is happening?
-
-```text
-P95 latency increased
-Request timeouts increased
-Database latency increased
-```
-
-### 2. Signals
-
-Where is the problem visible?
-
-```text
-API
-Database
-Application logs
-Deployment history
-```
-
-### 3. Correlation
-
-Do the signals line up in time and behavior?
-
-```text
-Deployment
-      ↓
-Query modification
-      ↓
-Database latency
-      ↓
-API latency
-      ↓
-Timeouts
-```
-
-### 4. Hypothesis
-
-What is the most likely explanation?
-
-```text
-Query performance regression
-```
-
-### 5. Confidence
-
-How strong is the evidence?
-
-```text
-High
-Medium
-Low
-```
-
-### 6. Missing Evidence
-
-What would be required to confirm the hypothesis?
-
-```text
-EXPLAIN ANALYZE
-Query execution plan
-Index usage
-Database query statistics
-```
-
-This prevents the agent from confusing correlation with proof.
-
----
-
-## RAG / Operational Knowledge
-
-A major part of CloudOps AI is giving the agent access to operational knowledge.
-
-Example:
-
-```text
-data/runbooks/payment-api.md
-```
-
-The runbook can contain:
-
-```text
-- High latency troubleshooting
-- Database troubleshooting
-- Known failure modes
-- Deployment procedures
-- Index recommendations
-- Recovery procedures
-```
-
-The RAG pipeline will eventually work as:
-
-```text
-Runbooks / Documents
-        │
-        ▼
-Document Loader
-        │
-        ▼
-Chunking
-        │
-        ▼
-Embeddings
-        │
-        ▼
-Vector Store
-        │
-        ▼
-Retriever
-        │
-        ▼
-search_runbook()
-        │
-        ▼
-Gemini Agent
-```
-
-This allows CloudOps AI to combine **live operational evidence** with **organizational knowledge**.
-
----
-
-## Planned Production Architecture
-
-Once the local MVP is stable, the mock sources will be replaced with real cloud services.
-
-```text
-                         ┌──────────────────┐
-                         │ Incident Source  │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │ Google Pub/Sub   │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │ CloudOps AI      │
-                         │ Agent            │
-                         └────────┬─────────┘
-                                  │
-              ┌───────────────────┼───────────────────┐
-              │                   │                   │
-              ▼                   ▼                   ▼
-       Cloud Monitoring    Cloud Logging        Deployment Data
-              │                   │                   │
-              └───────────────────┼───────────────────┘
-                                  │
-                                  ▼
-                           RAG / Runbooks
-                                  │
-                                  ▼
-                         Evidence Correlation
-                                  │
-                                  ▼
-                              Gemini
-                                  │
-                                  ▼
-                         Incident Report
-```
-
----
-
-## Safety Model
-
-CloudOps AI is intentionally designed as a **read-only incident investigator** in the initial versions.
-
-### The Agent Can
+## The System Can
 
 ```text
 ✓ Read metrics
@@ -533,11 +828,14 @@ CloudOps AI is intentionally designed as a **read-only incident investigator** i
 ✓ Read deployment information
 ✓ Search operational documentation
 ✓ Analyze incidents
-✓ Identify likely causes
+✓ Detect anomalies
+✓ Correlate evidence
+✓ Generate root-cause hypotheses
+✓ Assign evidence-supported confidence
 ✓ Recommend remediation
 ```
 
-### The Agent Cannot
+## The System Cannot
 
 ```text
 ✗ Deploy code
@@ -548,13 +846,77 @@ CloudOps AI is intentionally designed as a **read-only incident investigator** i
 ✗ Modify production configuration
 ```
 
-Any production-changing recommendation requires human approval and execution.
-
-Future autonomous remediation, if ever introduced, should use explicit permissions, safeguards, approval policies, and auditability.
+Production-changing actions require human approval and execution.
 
 ---
 
-## Project Structure
+# Technology Stack
+
+| Layer            | Technology                 | Purpose                              |
+| ---------------- | -------------------------- | ------------------------------------ |
+| Language         | Python                     | Core application                     |
+| API              | FastAPI                    | Incident ingestion and APIs          |
+| Agent Framework  | Google ADK                 | Agent orchestration                  |
+| AI Model         | Gemini                     | Agent reasoning                      |
+| RAG              | Sentence Transformers      | Semantic embeddings                  |
+| Vector Search    | FAISS                      | Runbook retrieval                    |
+| Observability    | Local provider abstraction | Metrics, logs, deployments           |
+| Event Queue      | asyncio.Queue              | Local asynchronous event processing  |
+| Worker           | Python asyncio             | Background incident processing       |
+| Database         | PostgreSQL                 | Planned persistent incident storage  |
+| ORM              | SQLAlchemy Async           | Planned database access              |
+| Migrations       | Alembic                    | Planned schema migrations            |
+| Containerization | Docker                     | Application/infrastructure packaging |
+| Testing          | Pytest                     | Automated testing                    |
+| Load Testing     | k6 / Locust                | Planned performance testing          |
+
+---
+
+# Current vs Planned Infrastructure
+
+The current implementation intentionally avoids requiring paid cloud infrastructure.
+
+## Currently Implemented
+
+```text
+FastAPI
+Google ADK
+Gemini integration
+Local observability provider
+Local metrics
+Local logs
+Local deployments
+Local runbooks
+Sentence Transformers
+FAISS
+Evidence correlation
+RCA engine
+Confidence calibration
+Incident events
+asyncio.Queue
+Background worker
+Incident lifecycle tracking
+```
+
+## Planned Production Integrations
+
+```text
+Google Cloud Monitoring
+Google Cloud Logging
+Google Pub/Sub
+Cloud Storage
+Cloud SQL / PostgreSQL
+Cloud Run
+IAM
+Secret Manager
+Cloud Build
+```
+
+The local architecture is designed so these components can be introduced incrementally.
+
+---
+
+# Project Structure
 
 ```text
 cloudops-ai/
@@ -573,24 +935,60 @@ cloudops-ai/
 │   ├── agents/
 │   │   ├── __init__.py
 │   │   ├── cloudops_agent.py
-│   │   └── test_agent.py
+│   │   ├── test_agent.py
+│   │   └── test_gemini.py
 │   │
 │   ├── tools/
 │   │   ├── __init__.py
 │   │   ├── metrics.py
 │   │   ├── logs.py
-│   │   └── deployments.py
+│   │   ├── deployments.py
+│   │   └── investigation.py
+│   │
+│   ├── observability/
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   ├── local.py
+│   │   ├── time_utils.py
+│   │   ├── analyzer.py
+│   │   ├── timeline.py
+│   │   ├── evidence.py
+│   │   ├── investigator.py
+│   │   ├── summary.py
+│   │   ├── rca.py
+│   │   ├── confidence.py
+│   │   ├── report.py
+│   │   ├── reasoner.py
+│   │   └── tests
 │   │
 │   ├── rag/
 │   │   ├── __init__.py
 │   │   ├── loader.py
+│   │   ├── chunker.py
 │   │   ├── embeddings.py
 │   │   ├── store.py
-│   │   └── retriever.py
+│   │   ├── retriever.py
+│   │   └── test_rag.py
 │   │
 │   ├── models/
 │   │   ├── __init__.py
 │   │   └── incident.py
+│   │
+│   ├── incidents/
+│   │   ├── __init__.py
+│   │   ├── state.py
+│   │   ├── store.py
+│   │   └── service.py
+│   │
+│   ├── events/
+│   │   ├── __init__.py
+│   │   ├── models.py
+│   │   ├── bus.py
+│   │   ├── handlers.py
+│   │   ├── queue.py
+│   │   ├── worker.py
+│   │   ├── service.py
+│   │   └── test_event_flow.py
 │   │
 │   └── services/
 │       └── __init__.py
@@ -598,13 +996,10 @@ cloudops-ai/
 ├── data/
 │   ├── logs/
 │   │   └── payment-api.log
-│   │
 │   ├── metrics/
 │   │   └── payment-api.json
-│   │
 │   ├── deployments/
 │   │   └── payment-api.json
-│   │
 │   └── runbooks/
 │       └── payment-api.md
 │
@@ -621,21 +1016,21 @@ cloudops-ai/
 
 ---
 
-## Development Roadmap
+# Development Roadmap
 
-CloudOps AI will be developed incrementally.
+CloudOps AI is being developed incrementally.
 
-### Milestone 1 — Backend Foundation
+## Milestone 1 — Backend Foundation
 
 * [x] FastAPI application
 * [x] Health endpoint
 * [x] Incident API
-* [x] Pydantic incident model
+* [x] Pydantic request models
 * [x] Project configuration
 * [x] Docker setup
 * [x] Mock operational data
 
-### Milestone 2 — Agentic Investigation
+## Milestone 2 — Agentic Investigation
 
 * [x] Gemini integration
 * [x] Google ADK integration
@@ -644,134 +1039,247 @@ CloudOps AI will be developed incrementally.
 * [x] Logs tool
 * [x] Deployment tool
 * [x] Tool-based investigation
-* [x] Evidence correlation
-* [x] Root-cause analysis
-* [x] Confidence assessment
+* [x] Evidence-driven reasoning
 * [x] Read-only safety model
 
-### Milestone 3 — RAG
+## Milestone 3 — RAG
 
-* [ ] Runbook document loader
-* [ ] Document chunking
-* [ ] Embedding generation
-* [ ] Vector store
-* [ ] Semantic retrieval
-* [ ] `search_runbook()` tool
-* [ ] Integrate RAG with the agent
-* [ ] Evidence + operational knowledge reasoning
+* [x] Runbook document loader
+* [x] Section-aware document chunking
+* [x] Embedding generation
+* [x] FAISS vector store
+* [x] Semantic retrieval
+* [x] Runbook retrieval
+* [x] RAG integration with investigation
+* [x] Operational knowledge retrieval
 
-### Milestone 4 — Real Observability
+## Milestone 4 — Observability & RCA
 
-Replace local mock data with real production observability sources.
+* [x] Observability provider abstraction
+* [x] Historical metrics
+* [x] Baseline calculation
+* [x] Anomaly detection
+* [x] Time-window-aware log search
+* [x] Incident timeline generation
+* [x] Evidence collection
+* [x] Evidence strength scoring
+* [x] Investigation engine
+* [x] Investigation summary
+* [x] Deterministic RCA
+* [x] Confidence calibration
+* [x] Missing-evidence identification
+* [x] Final incident report
+* [x] Gemini reasoning layer with fallback architecture
 
-* [ ] Google Cloud Monitoring integration
-* [ ] Google Cloud Logging integration
-* [ ] Real deployment metadata
-* [ ] Time-window based log investigation
-* [ ] Metric anomaly investigation
-* [ ] Production evidence correlation
+## Milestone 5 — Event-Driven Investigation
 
-### Milestone 5 — Event-Driven Investigation
+### 5.1 Incident Events
 
-Introduce automatic incident triggering.
+* [x] Incident event model
+* [x] Event IDs
+* [x] Event metadata
+* [x] Event serialization
 
-```text
-Monitoring Alert
-      ↓
-Google Pub/Sub
-      ↓
-CloudOps AI
-      ↓
-Investigation
-      ↓
-RCA
-      ↓
-Incident Report
-```
+### 5.2 Incident State
 
-Tasks:
+* [x] Incident state model
+* [x] Lifecycle tracking
+* [x] Investigation timestamps
+* [x] Report storage
+* [x] Failure state
 
-* [ ] Pub/Sub integration
-* [ ] Alert ingestion
-* [ ] Automatic investigation trigger
-* [ ] Incident lifecycle
-* [ ] Investigation status
-* [ ] Persistent incident records
+### 5.3 FastAPI Incident API
 
-### Milestone 6 — Productionization
+* [x] Incident creation
+* [x] Incident status endpoint
+* [x] Incident retrieval endpoint
+* [x] HTTP 202 asynchronous ingestion
 
-* [ ] PostgreSQL / Cloud SQL
-* [ ] Cloud Run deployment
-* [ ] Secret Manager
-* [ ] IAM permissions
-* [ ] Cloud Build CI/CD
-* [ ] Structured logging
-* [ ] Error handling
-* [ ] Retry mechanisms
+### 5.4 Background Processing
+
+* [x] FastAPI background worker integration
+* [x] Asynchronous incident processing
+* [x] Investigation execution outside request lifecycle
+
+### 5.5 Local Event Queue
+
+* [x] asyncio.Queue
+* [x] Event publishing
+* [x] Event consumption
+* [x] Worker loop
+* [x] Queue size tracking
+
+### 5.6 Incident Lifecycle
+
+* [x] CREATED
+* [x] INVESTIGATING
+* [x] ANALYZING
+* [x] RCA
+* [x] REPORT_GENERATED
+* [x] COMPLETED
+* [x] FAILED
+* [x] Error capture
+* [x] Lifecycle timestamps
+
+### 5.7 PostgreSQL Persistence
+
+* [ ] PostgreSQL incident persistence
+* [ ] SQLAlchemy AsyncSession
+* [ ] Incident repository
+* [ ] Alembic migrations
+* [ ] Persistent incident reports
+* [ ] Persistent lifecycle state
+
+## Milestone 5.8 — Reliability
+
+* [ ] Retry handling
+* [ ] Failure recovery
+* [ ] Dead-letter strategy
+* [ ] Worker failure handling
+
+## Milestone 5.9 — Idempotency
+
+* [ ] Duplicate incident detection
+* [ ] Idempotent event processing
+* [ ] Duplicate investigation prevention
+
+## Milestone 5.10 — Worker Concurrency
+
+* [ ] Multiple workers
+* [ ] Concurrent investigations
+* [ ] Queue backpressure
+* [ ] Concurrency limits
+
+## Milestone 5.11 — API Hardening
+
 * [ ] Authentication
-* [ ] Unit tests
-* [ ] Integration tests
-* [ ] Agent evaluation tests
-* [ ] Load testing with k6 / Locust
-* [ ] Observability for CloudOps AI itself
+* [ ] Request validation improvements
+* [ ] Rate limiting
+* [ ] Structured API errors
+* [ ] API observability
 
 ---
 
-## Testing Strategy
+# Milestone 6 — Real Event Infrastructure
 
-CloudOps AI will be tested at multiple levels.
+The local event queue will eventually be replaced by a production event broker.
 
-### Unit Tests
-
-Test individual tools:
+Potential architecture:
 
 ```text
-get_service_metrics()
-search_logs()
-get_recent_deployment()
-search_runbook()
+Monitoring Alert
+      │
+      ▼
+Google Pub/Sub
+      │
+      ▼
+CloudOps AI
+      │
+      ▼
+Investigation Worker
+      │
+      ▼
+Incident Investigation
 ```
 
-### Agent Tests
+Planned components:
 
-Test whether the agent:
+```text
+Google Pub/Sub
+Google Cloud Monitoring
+Google Cloud Logging
+Deployment Metadata
+PostgreSQL / Cloud SQL
+```
 
-* Calls appropriate tools
-* Uses tool results correctly
-* Avoids inventing evidence
-* Distinguishes facts from hypotheses
-* Produces consistent RCA reports
+---
 
-### Incident Scenarios
+# Milestone 7 — Productionization
 
-Example scenarios:
+Future production capabilities:
+
+```text
+PostgreSQL / Cloud SQL
+Cloud Run
+IAM
+Secret Manager
+Cloud Build
+Structured Logging
+Authentication
+Retry Policies
+Monitoring
+Alerting
+```
+
+Testing will include:
+
+```text
+Unit Tests
+Integration Tests
+Agent Evaluation
+Load Testing
+Failure Testing
+Concurrency Testing
+```
+
+---
+
+# Testing Strategy
+
+CloudOps AI is tested at multiple levels.
+
+## Unit Tests
+
+Current test coverage includes components such as:
+
+```text
+Metric Analyzer
+Log Filtering
+Incident Timeline
+Evidence Collection
+Investigation Engine
+RAG Retrieval
+Event Flow
+```
+
+Example:
+
+```powershell
+pytest
+```
+
+---
+
+# Investigation Scenarios
+
+The system is designed to handle scenarios such as:
 
 ```text
 1. Database latency increase
 2. CPU saturation
 3. Memory pressure
 4. Error-rate spike
-5. Failed deployment
+5. Deployment-related degradation
 6. Dependency latency
 7. Network-related degradation
 8. Insufficient evidence
 ```
 
-### Load Testing
+The objective is not to force a root cause.
 
-The API will eventually be tested using:
-
-```text
-k6
-```
-
-or:
+If evidence is insufficient, the system should explicitly report:
 
 ```text
-Locust
+Insufficient Evidence
 ```
 
-Metrics to evaluate include:
+and identify what additional evidence is required.
+
+---
+
+# Load Testing
+
+Performance testing will eventually evaluate:
 
 ```text
 Requests/sec
@@ -781,105 +1289,106 @@ P95 latency
 P99 latency
 Error rate
 Throughput
+Queue processing time
+Worker utilization
 ```
+
+Potential tools:
+
+```text
+k6
+Locust
+```
+
+No performance claims are made until the system has been benchmarked.
 
 ---
 
-## Example API
+# Local Development
 
-### Create Incident
-
-```http
-POST /incidents/
-Content-Type: application/json
-```
-
-Request:
-
-```json
-{
-  "service": "payment-api",
-  "description": "Payment API latency has suddenly increased",
-  "severity": "high"
-}
-```
-
-Response:
-
-```json
-{
-  "message": "Incident received",
-  "incident": {
-    "service": "payment-api",
-    "description": "Payment API latency has suddenly increased",
-    "severity": "high"
-  }
-}
-```
-
----
-
-## Local Development
-
-### Clone the Repository
+## Clone Repository
 
 ```bash
-git clone https://github.com/<your-username>/cloudops-ai.git
+git clone <your-repository-url>
 cd cloudops-ai
 ```
 
-### Create Virtual Environment
+## Create Virtual Environment
 
-Windows:
+### Windows
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\activate
 ```
 
-Linux/macOS:
+### Linux/macOS
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-### Install Dependencies
+## Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### Configure Environment Variables
+---
 
-Create a `.env` file:
+# Environment Configuration
+
+Create:
+
+```text
+.env
+```
+
+Example:
 
 ```env
 APP_NAME=CloudOps AI
 ENVIRONMENT=development
-
 GOOGLE_API_KEY=YOUR_GEMINI_API_KEY
 ```
 
-Do not commit `.env` to GitHub.
+Do not commit `.env`.
 
-The `.env` file should remain in `.gitignore`.
+Use:
+
+```text
+.env.example
+```
+
+to document required variables.
+
+Never commit:
+
+```text
+API keys
+Passwords
+Database credentials
+Access tokens
+Private keys
+Service account credentials
+```
 
 ---
 
-## Run the FastAPI Application
+# Run FastAPI
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-The API will be available locally at:
+Application:
 
 ```text
 http://localhost:8000
 ```
 
-API documentation:
+Swagger documentation:
 
 ```text
 http://localhost:8000/docs
@@ -893,94 +1402,44 @@ http://localhost:8000/health
 
 ---
 
-## Run the AI Agent
+# Run Agent Investigation
 
 ```bash
 python -m app.agents.test_agent
 ```
 
-Example:
+The investigation produces structured evidence and RCA information such as:
 
 ```text
-Starting CloudOps AI investigation...
-
-## Incident
-
-The Payment API is experiencing increased latency...
-
-## Affected Service
-
-payment-api
-
-## Observed Evidence
-
-...
-
-## Investigation
-
-...
-
-## Likely Root Cause
-
-...
-
-## Confidence
-
-High
-
-## Recommendation
-
-...
+Affected Service
+Investigation Window
+Observed Metrics
+Anomalies
+Logs
+Deployment
+Timeline
+Evidence
+Root-Cause Hypotheses
+Confidence
+Missing Evidence
+Recommendations
 ```
 
 ---
 
-## Environment and Security
+# Design Principles
 
-Sensitive configuration should never be committed to the repository.
+## Evidence First
 
-The following files should remain local:
+The system gathers evidence before generating conclusions.
 
-```text
-.env
-```
+## No Hallucinated Observability
 
-Use:
+If a metric, log, deployment, or operational fact was not observed, the system must not invent it.
 
-```text
-.env.example
-```
+## Correlation Over Guessing
 
-for documenting required environment variables.
-
-Never commit:
-
-```text
-API keys
-Service account credentials
-Passwords
-Database credentials
-Access tokens
-Private keys
-```
-
-Production secrets will eventually be managed using **Google Secret Manager**.
-
----
-
-## Design Principles
-
-### Evidence First
-
-The agent should gather evidence before reaching conclusions.
-
-### No Hallucinated Observability
-
-If a metric, log, deployment, or operational fact was not observed, the agent must not invent it.
-
-### Correlation Over Guessing
-
-The agent should correlate:
+The system correlates:
 
 ```text
 Time
@@ -994,37 +1453,41 @@ Deployments
 Operational Knowledge
 ```
 
-before selecting a root cause.
+before selecting root-cause hypotheses.
 
-### Confidence Matters
+## Confidence Matters
 
-Every RCA should communicate how strong the evidence is.
+Every hypothesis should communicate the strength of its supporting evidence.
 
-### Read-Only by Default
+## Missing Evidence Matters
 
-The initial system investigates and recommends. It does not modify production.
+A good investigation identifies what is still required to confirm or reject a hypothesis.
 
-### Human-in-the-Loop
+## Read-Only by Default
+
+The system investigates and recommends. It does not modify production.
+
+## Human-in-the-Loop
 
 Production-changing actions require human approval.
 
-### Incremental Architecture
+## Incremental Architecture
 
-The system starts with local data and gradually moves toward real cloud infrastructure.
+The system starts locally and evolves toward production infrastructure without requiring cloud services during early development.
 
 ---
 
-## Future Capabilities
+# Future Capabilities
 
 Potential future extensions include:
 
 ```text
-Incident History
-      ↓
+Historical Incident Search
+        ↓
 Similar Incident Detection
-      ↓
+        ↓
 Previous RCA Retrieval
-      ↓
+        ↓
 Faster Investigation
 ```
 
@@ -1032,58 +1495,79 @@ Additional possibilities:
 
 * Historical incident analysis
 * Service dependency graphs
-* Anomaly detection
 * Deployment risk analysis
-* Automatic incident summarization
-* Slack / ChatOps integration
-* PagerDuty integration
-* Alert deduplication
+* Incident deduplication
 * Incident timeline generation
 * Change-impact analysis
 * Multi-service investigations
-* Human-approved remediation workflows
+* Slack / ChatOps integration
+* PagerDuty integration
+* Alert deduplication
 * Post-incident report generation
+* Human-approved remediation workflows
 
-Autonomous remediation will only be considered after strong safety controls, permissions, auditing, and evaluation are established.
+Autonomous remediation will only be considered after strong safety controls, explicit permissions, auditing, and extensive evaluation.
 
 ---
 
-## Project Status
+# Current Project Status
 
-**Current Status: Active Development**
+**Status: Active Development**
 
 ```text
-Milestone 1   ████████████████████  Complete
-Milestone 2   ████████████████████  Complete
-Milestone 3   ░░░░░░░░░░░░░░░░░░░░  Next
-Milestone 4   ░░░░░░░░░░░░░░░░░░░░  Planned
-Milestone 5   ░░░░░░░░░░░░░░░░░░░░  Planned
-Milestone 6   ░░░░░░░░░░░░░░░░░░░░  Planned
+Milestone 1       ████████████████████  Complete
+Milestone 2       ████████████████████  Complete
+Milestone 3       ████████████████████  Complete
+Milestone 4       ████████████████████  Complete
+Milestone 5.1     ████████████████████  Complete
+Milestone 5.2     ████████████████████  Complete
+Milestone 5.3     ████████████████████  Complete
+Milestone 5.4     ████████████████████  Complete
+Milestone 5.5     ████████████████████  Complete
+Milestone 5.6     ████████████████████  Complete
+
+Milestone 5.7     ░░░░░░░░░░░░░░░░░░░░  Next
 ```
 
-The current implementation successfully demonstrates:
+### Current capabilities
 
 ```text
 Incident
    ↓
-Gemini Agent
+FastAPI
    ↓
-Tool Calling
+Incident Event
    ↓
-Metrics + Logs + Deployment
+Async Queue
    ↓
-Evidence Correlation
+Background Worker
    ↓
-Root Cause Analysis
+Observability Investigation
    ↓
-Human-approved Recommendation
+Metrics + Logs + Deployments
+   ↓
+Baseline + Anomaly Detection
+   ↓
+Timeline + Evidence Correlation
+   ↓
+RAG / Runbooks
+   ↓
+Deterministic RCA
+   ↓
+Confidence Calibration
+   ↓
+Final Incident Report
 ```
 
-The next major milestone is **RAG-powered operational knowledge retrieval**.
+The next milestone is:
+
+> **PostgreSQL Persistence**
+
+This will make incident state and investigation reports durable across application restarts.
 
 ---
 
-## License
+# License
 
 This project is currently intended as an engineering and learning project.
 
@@ -1091,7 +1575,7 @@ License information will be added as the project evolves.
 
 ---
 
-## Author
+# Author
 
 **Srinu**
 
@@ -1099,14 +1583,14 @@ Building CloudOps AI as an exploration of:
 
 ```text
 Agentic AI
-+
-Site Reliability Engineering
-+
+    +
 Observability
-+
+    +
+Site Reliability Engineering
+    +
+Backend Engineering
+    +
 System Design
-+
+    +
 Cloud Infrastructure
 ```
-
----
